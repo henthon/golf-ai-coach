@@ -236,6 +236,7 @@ canvas {
 }
 
 .primary-button,
+.secondary-button,
 .icon-button,
 .file-button,
 .text-button,
@@ -256,6 +257,15 @@ canvas {
   color: #062017;
   border-color: transparent;
   font-weight: 850;
+}
+
+.secondary-button {
+  min-height: 48px;
+  padding: 0 14px;
+  font-weight: 750;
+  color: #dbeafe;
+  border-color: rgba(96, 165, 250, 0.45);
+  background: rgba(30, 64, 175, 0.22);
 }
 
 .button-icon {
@@ -439,6 +449,10 @@ input[type="range"] {
   .primary-button {
     flex: 1 1 100%;
     justify-content: center;
+  }
+
+  .secondary-button {
+    flex: 1 1 auto;
   }
 
   .current-tip p {

@@ -7,6 +7,7 @@ const els = {
   start: $("#startButton"),
   mute: $("#muteButton"),
   muteIcon: $("#muteIcon"),
+  testAudio: $("#testAudioButton"),
   calibrate: $("#calibrateButton"),
   demo: $("#demoButton"),
   file: $("#fileInput"),
@@ -51,6 +52,9 @@ const state = {
   consistency: [],
   lastCueAt: 0,
   lastCueText: "",
+  audioContext: null,
+  audioUnlocked: false,
+  voices: [],
   clockTimer: null,
   animationId: null,
   demoStartedAt: 0
@@ -71,6 +75,16 @@ const modeCopy = {
   downline: "后方视角",
   fitness: "通用运动"
 };
+
+function refreshVoices() {
+  if (!("speechSynthesis" in window)) return;
+  state.voices = window.speechSynthesis.getVoices();
+}
+
+if ("speechSynthesis" in window) {
+  refreshVoices();
+  window.speechSynthesis.onvoiceschanged = refreshVoices;
+}
 
 function setStatus(text, tone = "ready") {
   els.modelStatus.textContent = text;
@@ -110,15 +124,66 @@ async function loadPoseModel() {
   }
 }
 
-function speak(text, force = false) {
+async function unlockAudio() {
+  try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (AudioContextClass && !state.audioContext) {
+      state.audioContext = new AudioContextClass();
+    }
+    if (state.audioContext?.state === "suspended") {
+      await state.audioContext.resume();
+    }
+    state.audioUnlocked = true;
+    return true;
+  } catch (error) {
+    console.info("Audio unlock failed.", error);
+    return false;
+  }
+}
+
+function playCueTone() {
+  if (state.muted || !state.audioContext || state.audioContext.state !== "running") return;
+  const now = state.audioContext.currentTime;
+  const oscillator = state.audioContext.createOscillator();
+  const gain = state.audioContext.createGain();
+  oscillator.type = "sine";
+  oscillator.frequency.setValueAtTime(660, now);
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(0.08, now + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.16);
+  oscillator.connect(gain);
+  gain.connect(state.audioContext.destination);
+  oscillator.start(now);
+  oscillator.stop(now + 0.18);
+}
+
+function pickVoice() {
+  refreshVoices();
+  return state.voices.find((voice) => /zh[-_](CN|HK|TW)/i.test(voice.lang))
+    || state.voices.find((voice) => /Chinese|Mandarin|Ting-Ting|Sin-ji|Mei-Jia/i.test(voice.name))
+    || state.voices.find((voice) => /^zh/i.test(voice.lang))
+    || state.voices[0]
+    || null;
+}
+
+async function speak(text, force = false) {
   if (state.muted && !force) return;
-  if (!("speechSynthesis" in window)) return;
+  if (!("speechSynthesis" in window)) {
+    setStatus("浏览器不支持语音", "warn");
+    return;
+  }
+  await unlockAudio();
+  playCueTone();
   window.speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = "zh-CN";
+  const voice = pickVoice();
+  if (voice) utterance.voice = voice;
   utterance.rate = 1.04;
   utterance.pitch = 0.95;
-  window.speechSynthesis.speak(utterance);
+  utterance.volume = 1;
+  utterance.onerror = () => setStatus("语音被浏览器拦截", "warn");
+  window.setTimeout(() => window.speechSynthesis.speak(utterance), 60);
 }
 
 function addCue(text, severity = "info", force = false) {
@@ -656,6 +721,7 @@ els.start.addEventListener("click", () => {
   if (state.running) {
     stopAnalysis();
   } else {
+    unlockAudio();
     startCamera();
   }
 });
@@ -666,10 +732,21 @@ els.mute.addEventListener("click", () => {
   if (!state.muted) speak("语音提示已打开。", true);
 });
 
+els.testAudio.addEventListener("click", async () => {
+  state.muted = false;
+  els.muteIcon.textContent = "🔊";
+  const unlocked = await unlockAudio();
+  els.currentTip.textContent = unlocked
+    ? "语音测试已发送。如果耳机没有声音，请检查手机音量、蓝牙输出和浏览器权限。"
+    : "浏览器没有打开音频通道。请换 Safari 或 Chrome 再试一次。";
+  speak("耳机测试。听到这句话，就说明实时教练语音已经打开。", true);
+});
+
 els.calibrate.addEventListener("click", () => resetAnalysis(true));
 
 els.demo.addEventListener("click", () => {
   if (state.running) stopAnalysis();
+  unlockAudio();
   beginDemo();
 });
 
