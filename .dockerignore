@@ -1,0 +1,7 @@
+.git
+.DS_Store
+.loopcoach-cert.pem
+.loopcoach-key.pem
+node_modules
+*.log
+

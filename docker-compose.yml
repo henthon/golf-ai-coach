@@ -1,0 +1,19 @@
+services:
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./index.html:/srv/index.html:ro
+      - ./styles.css:/srv/styles.css:ro
+      - ./app.js:/srv/app.js:ro
+      - ./manifest.webmanifest:/srv/manifest.webmanifest:ro
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

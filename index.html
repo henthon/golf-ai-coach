@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="zh-Hans">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0f172a" />
+    <title>LoopCoach | 实时高尔夫耳机教练</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="coach-stage" aria-label="实时教练">
+        <div class="top-bar">
+          <div class="brand">
+            <span class="brand-mark" aria-hidden="true">LC</span>
+            <div>
+              <h1>LoopCoach</h1>
+              <p>高尔夫实时耳机教练</p>
+            </div>
+          </div>
+          <div class="status-pill" id="modelStatus">离线分析就绪</div>
+        </div>
+
+        <div class="camera-panel">
+          <video id="camera" playsinline muted></video>
+          <canvas id="overlay"></canvas>
+          <div class="camera-empty" id="cameraEmpty">
+            <div class="empty-ring"></div>
+            <h2>把手机架在侧面或正后方</h2>
+            <p>点击开始后，挥杆时保持全身和球杆进入画面。耳机里只会播报最关键的一条提示。</p>
+          </div>
+          <div class="meter-stack" aria-hidden="true">
+            <div class="meter">
+              <span>节奏</span>
+              <strong id="tempoValue">--</strong>
+            </div>
+            <div class="meter">
+              <span>稳定</span>
+              <strong id="stabilityValue">--</strong>
+            </div>
+            <div class="meter">
+              <span>幅度</span>
+              <strong id="rangeValue">--</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="control-rack">
+          <button class="primary-button" id="startButton" type="button">
+            <span class="button-icon">▶</span>
+            <span>开始实时指导</span>
+          </button>
+          <button class="icon-button" id="muteButton" type="button" aria-label="语音开关" title="语音开关">
+            <span id="muteIcon">🔊</span>
+          </button>
+          <button class="icon-button" id="calibrateButton" type="button" aria-label="重新校准" title="重新校准">
+            <span>◎</span>
+          </button>
+          <button class="icon-button" id="demoButton" type="button" aria-label="演示模式" title="演示模式">
+            <span>◌</span>
+          </button>
+          <label class="file-button" title="上传挥杆视频">
+            <input id="fileInput" type="file" accept="video/*" />
+            <span>上传视频</span>
+          </label>
+        </div>
+      </section>
+
+      <aside class="coach-board" aria-label="教练面板">
+        <div class="panel-section current-tip">
+          <span class="eyebrow">当前提示</span>
+          <p id="currentTip">准备开始。第一版会先识别节奏、晃动、上杆幅度和击球后抬头趋势。</p>
+        </div>
+
+        <div class="panel-section">
+          <div class="section-heading">
+            <h2>训练模式</h2>
+            <span id="viewLabel">侧面视角</span>
+          </div>
+          <div class="segmented" role="group" aria-label="训练模式">
+            <button class="segment active" data-mode="side" type="button">侧面</button>
+            <button class="segment" data-mode="downline" type="button">后方</button>
+            <button class="segment" data-mode="fitness" type="button">通用</button>
+          </div>
+        </div>
+
+        <div class="panel-section">
+          <div class="section-heading">
+            <h2>反馈强度</h2>
+            <strong id="strictnessLabel">平衡</strong>
+          </div>
+          <input id="strictness" type="range" min="1" max="3" value="2" />
+          <div class="range-labels">
+            <span>少说</span>
+            <span>平衡</span>
+            <span>严格</span>
+          </div>
+        </div>
+
+        <div class="panel-section">
+          <div class="section-heading">
+            <h2>本次练习</h2>
+            <strong id="sessionClock">00:00</strong>
+          </div>
+          <div class="stats-grid">
+            <div>
+              <span>挥杆</span>
+              <strong id="swingCount">0</strong>
+            </div>
+            <div>
+              <span>提示</span>
+              <strong id="cueCount">0</strong>
+            </div>
+            <div>
+              <span>最佳节奏</span>
+              <strong id="bestTempo">--</strong>
+            </div>
+            <div>
+              <span>一致性</span>
+              <strong id="consistencyScore">--</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel-section">
+          <div class="section-heading">
+            <h2>提示记录</h2>
+            <button class="text-button" id="clearLog" type="button">清空</button>
+          </div>
+          <ol class="cue-log" id="cueLog"></ol>
+        </div>
+      </aside>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

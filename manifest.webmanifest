@@ -1,0 +1,10 @@
+{
+  "name": "LoopCoach",
+  "short_name": "LoopCoach",
+  "description": "Real-time audio coaching prototype for golf practice.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#08111f",
+  "theme_color": "#0f172a",
+  "icons": []
+}
