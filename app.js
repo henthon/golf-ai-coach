@@ -38,6 +38,9 @@ const state = {
   startedAt: null,
   lastFrameAt: 0,
   baseline: null,
+  armed: false,
+  quietStartedAt: null,
+  ignoreMotionUntil: 0,
   previousFrame: null,
   previousMotion: null,
   poseLandmarker: null,
@@ -328,6 +331,9 @@ function stopSource() {
 
 function resetAnalysis(announce = true) {
   state.baseline = null;
+  state.armed = state.sourceType === "demo";
+  state.quietStartedAt = null;
+  state.ignoreMotionUntil = performance.now() + 1600;
   state.previousFrame = null;
   state.previousMotion = null;
   state.samples = [];
@@ -352,12 +358,12 @@ function beginAnalysis() {
   els.consistencyScore.textContent = "--";
   els.empty.classList.add("hidden");
   els.start.innerHTML = '<span class="button-icon">■</span><span>停止指导</span>';
-  setStatus("实时分析中", "live");
   resetAnalysis(false);
+  setStatus("校准中，请站稳", "warn");
   clearInterval(state.clockTimer);
   state.clockTimer = setInterval(updateClock, 500);
   updateClock();
-  showCueText("我开始看你的动作了。先做一次自然挥杆，我会等动作完成后再提示。");
+  showCueText("先站稳 2 秒让我校准。提示变成“可以挥杆”后再挥杆，我会等动作完成后播报。");
   requestAnimationFrame(analyzeFrame);
 }
 
@@ -545,12 +551,46 @@ function updateBaseline(sample) {
   state.baseline.count += 1;
 }
 
+function updateArming(sample) {
+  if (state.sourceType === "demo") {
+    state.armed = true;
+    return true;
+  }
+
+  const now = sample.timestamp;
+  if (now < state.ignoreMotionUntil) {
+    setStatus("校准中，请站稳", "warn");
+    return false;
+  }
+
+  if (state.armed) return true;
+
+  const quietEnough = sample.avgEnergy < 4.2;
+  if (quietEnough) {
+    if (!state.quietStartedAt) state.quietStartedAt = now;
+    const quietDuration = now - state.quietStartedAt;
+    if (quietDuration > 1400 && state.baseline?.count >= 5) {
+      state.armed = true;
+      setStatus("已校准，可以挥杆", "live");
+      showCueText("已校准。现在挥杆，动作完成后我只播报一条最关键提示。");
+      return true;
+    }
+  } else {
+    state.quietStartedAt = null;
+    setStatus("请先站稳校准", "warn");
+  }
+
+  return false;
+}
+
 function classifySwing(sample) {
   const config = strictnessMap[state.strictness];
   const active = sample.avgEnergy > config.energy;
+  const startMotionSpread = Math.max(sample.widthRatio, sample.heightRatio);
+  const startActive = sample.avgEnergy > Math.max(16, config.energy * 1.25) && startMotionSpread > 0.14;
   const now = sample.timestamp;
 
-  if (!state.swing && active) {
+  if (!state.swing && startActive) {
     state.swing = {
       startedAt: now,
       peakEnergy: sample.avgEnergy,
@@ -746,13 +786,18 @@ function analyzeFrame(timestamp) {
   raw.pose = getPoseSample(timestamp);
   const sample = smoothSamples(raw);
   updateBaseline(sample);
-  classifySwing(sample);
+  const armed = updateArming(sample);
+  if (armed) {
+    classifySwing(sample);
+  } else {
+    state.swing = null;
+  }
   drawOverlay(sample);
   state.previousMotion = sample;
 
-  if (!state.baseline && state.samples.length > 30) {
+  if (!state.armed && !state.baseline && state.samples.length > 30) {
     setStatus("请保持站姿 2 秒校准", "warn");
-  } else if (state.baseline) {
+  } else if (state.armed) {
     setStatus("实时分析中", "live");
   }
 }
