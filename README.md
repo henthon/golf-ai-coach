@@ -45,3 +45,7 @@ This prototype is useful for validating the hands-free training experience. It i
 ## Public Deployment
 
 See [DEPLOY.md](./DEPLOY.md). The current MVP can be deployed as a static HTTPS site. A backend server is only needed later for accounts, saved videos, payments, datasets, or server-side AI.
+
+## Native iPhone App
+
+An iOS native prototype is now in [ios/LoopCoach](./ios/LoopCoach). It uses native camera capture and native iOS speech/audio routing, which should be more reliable than browser speech for delayed coaching cues.
