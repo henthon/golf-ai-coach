@@ -56,6 +56,7 @@ const state = {
   audioUnlocked: false,
   activeUtterance: null,
   lastSpeechError: "",
+  speechKeepAliveTimer: null,
   voices: [],
   clockTimer: null,
   animationId: null,
@@ -135,12 +136,26 @@ async function unlockAudio() {
     if (state.audioContext?.state === "suspended") {
       await state.audioContext.resume();
     }
+    startSpeechKeepAlive();
     state.audioUnlocked = true;
     return true;
   } catch (error) {
     console.info("Audio unlock failed.", error);
     return false;
   }
+}
+
+function wait(ms) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function startSpeechKeepAlive() {
+  if (!("speechSynthesis" in window) || state.speechKeepAliveTimer) return;
+  state.speechKeepAliveTimer = window.setInterval(() => {
+    if (!document.hidden && window.speechSynthesis.paused) {
+      window.speechSynthesis.resume();
+    }
+  }, 2500);
 }
 
 function playCueTone(force = false, pattern = "short") {
@@ -188,7 +203,7 @@ function coachSpeakText(text) {
     .trim();
 }
 
-async function speak(text, force = false) {
+async function speak(text, force = false, interrupt = force) {
   if (state.muted && !force) return;
   if (!("speechSynthesis" in window)) {
     setStatus("浏览器不支持语音", "warn");
@@ -199,7 +214,10 @@ async function speak(text, force = false) {
   playCueTone(force);
 
   const synth = window.speechSynthesis;
-  if (force) synth.cancel();
+  if (interrupt || synth.speaking || synth.pending) {
+    synth.cancel();
+    await wait(80);
+  }
   synth.resume();
 
   const utterance = new SpeechSynthesisUtterance(coachSpeakText(text));
@@ -254,7 +272,7 @@ function addCue(text, severity = "info", force = false) {
   item.append(time, body);
   els.cueLog.prepend(item);
   while (els.cueLog.children.length > 20) els.cueLog.lastElementChild.remove();
-  speak(text);
+  speak(text, false, true);
 }
 
 function updateClock() {
