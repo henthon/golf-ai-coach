@@ -251,7 +251,7 @@ async function speak(text, force = false, interrupt = force) {
   }, 900);
 }
 
-function addCue(text, severity = "info", force = false) {
+function addCue(text, severity = "info", force = false, shouldSpeak = true) {
   const now = performance.now();
   const config = strictnessMap[state.strictness];
   if (!force && text === state.lastCueText && now - state.lastCueAt < 10000) return;
@@ -272,7 +272,11 @@ function addCue(text, severity = "info", force = false) {
   item.append(time, body);
   els.cueLog.prepend(item);
   while (els.cueLog.children.length > 20) els.cueLog.lastElementChild.remove();
-  speak(text, false, true);
+  if (shouldSpeak) speak(text, true, true);
+}
+
+function showCueText(text) {
+  els.currentTip.textContent = text;
 }
 
 function updateClock() {
@@ -332,7 +336,7 @@ function resetAnalysis(announce = true) {
   els.tempoValue.textContent = "--";
   els.stabilityValue.textContent = "--";
   els.rangeValue.textContent = "--";
-  if (announce) addCue("已重新校准。下一杆保持站位两秒，让我建立你的静止基准。", "info");
+  if (announce) showCueText("已重新校准。下一杆保持站位两秒，让我建立你的静止基准。");
 }
 
 function beginAnalysis() {
@@ -353,7 +357,7 @@ function beginAnalysis() {
   clearInterval(state.clockTimer);
   state.clockTimer = setInterval(updateClock, 500);
   updateClock();
-  addCue("我开始看你的动作了。先做一次自然挥杆，我会等动作完成后再提示。", "info", true);
+  showCueText("我开始看你的动作了。先做一次自然挥杆，我会等动作完成后再提示。");
   requestAnimationFrame(analyzeFrame);
 }
 
@@ -378,7 +382,7 @@ function beginDemo() {
   clearInterval(state.clockTimer);
   state.clockTimer = setInterval(updateClock, 500);
   updateClock();
-  addCue("演示模式已启动。我会模拟几次挥杆，让你先体验耳机提示节奏。", "info", true);
+  showCueText("演示模式已启动。我会模拟几次挥杆，让你先体验耳机提示节奏。");
   requestAnimationFrame(analyzeDemoFrame);
 }
 
@@ -583,7 +587,9 @@ function classifySwing(sample) {
 
 function finishSwing(swing, endedAt) {
   const duration = (endedAt - swing.startedAt) / 1000;
-  if (duration < 0.55 || swing.peakEnergy < 9) return;
+  const movementSpread = Math.max(swing.maxWidth, swing.maxHeight);
+  const centerTravel = Math.hypot(swing.maxX - swing.minX, swing.maxY - swing.minY);
+  if (duration < 0.8 || swing.peakEnergy < 14 || movementSpread < 0.28 || centerTravel < 0.08) return;
 
   state.swingCount += 1;
   els.swingCount.textContent = String(state.swingCount);
