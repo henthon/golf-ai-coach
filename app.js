@@ -54,6 +54,8 @@ const state = {
   lastCueText: "",
   audioContext: null,
   audioUnlocked: false,
+  activeUtterance: null,
+  lastSpeechError: "",
   voices: [],
   clockTimer: null,
   animationId: null,
@@ -141,20 +143,27 @@ async function unlockAudio() {
   }
 }
 
-function playCueTone() {
-  if (state.muted || !state.audioContext || state.audioContext.state !== "running") return;
+function playCueTone(force = false, pattern = "short") {
+  if ((state.muted && !force) || !state.audioContext || state.audioContext.state !== "running") return;
   const now = state.audioContext.currentTime;
-  const oscillator = state.audioContext.createOscillator();
-  const gain = state.audioContext.createGain();
-  oscillator.type = "sine";
-  oscillator.frequency.setValueAtTime(660, now);
-  gain.gain.setValueAtTime(0.0001, now);
-  gain.gain.exponentialRampToValueAtTime(0.08, now + 0.02);
-  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.16);
-  oscillator.connect(gain);
-  gain.connect(state.audioContext.destination);
-  oscillator.start(now);
-  oscillator.stop(now + 0.18);
+  const notes = pattern === "double"
+    ? [{ at: 0, freq: 660 }, { at: 0.2, freq: 880 }]
+    : [{ at: 0, freq: 660 }];
+
+  notes.forEach((note) => {
+    const oscillator = state.audioContext.createOscillator();
+    const gain = state.audioContext.createGain();
+    const start = now + note.at;
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(note.freq, start);
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(0.12, start + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.18);
+    oscillator.connect(gain);
+    gain.connect(state.audioContext.destination);
+    oscillator.start(start);
+    oscillator.stop(start + 0.2);
+  });
 }
 
 function pickVoice() {
@@ -170,11 +179,16 @@ async function speak(text, force = false) {
   if (state.muted && !force) return;
   if (!("speechSynthesis" in window)) {
     setStatus("浏览器不支持语音", "warn");
+    playCueTone(force, "double");
     return;
   }
   await unlockAudio();
-  playCueTone();
-  window.speechSynthesis.cancel();
+  playCueTone(force);
+
+  const synth = window.speechSynthesis;
+  if (force) synth.cancel();
+  synth.resume();
+
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = "zh-CN";
   const voice = pickVoice();
@@ -182,8 +196,28 @@ async function speak(text, force = false) {
   utterance.rate = 1.04;
   utterance.pitch = 0.95;
   utterance.volume = 1;
-  utterance.onerror = () => setStatus("语音被浏览器拦截", "warn");
-  window.setTimeout(() => window.speechSynthesis.speak(utterance), 60);
+  utterance.onstart = () => {
+    state.lastSpeechError = "";
+    setStatus(state.running ? "实时分析中" : "语音已打开", state.running ? "live" : "ready");
+  };
+  utterance.onerror = (event) => {
+    state.lastSpeechError = event.error || "unknown";
+    setStatus("语音被浏览器拦截，已用提示音", "warn");
+    playCueTone(true, "double");
+  };
+  utterance.onend = () => {
+    if (state.activeUtterance === utterance) state.activeUtterance = null;
+  };
+
+  state.activeUtterance = utterance;
+  synth.speak(utterance);
+
+  window.setTimeout(() => {
+    if (state.activeUtterance === utterance && !synth.speaking && !synth.pending) {
+      setStatus("语音未启动，已用提示音", "warn");
+      playCueTone(true, "double");
+    }
+  }, 900);
 }
 
 function addCue(text, severity = "info", force = false) {
@@ -736,8 +770,9 @@ els.testAudio.addEventListener("click", async () => {
   state.muted = false;
   els.muteIcon.textContent = "🔊";
   const unlocked = await unlockAudio();
+  playCueTone(true, "double");
   els.currentTip.textContent = unlocked
-    ? "语音测试已发送。如果耳机没有声音，请检查手机音量、蓝牙输出和浏览器权限。"
+    ? "语音测试已发送。你应该先听到两声提示音，然后听到中文播报。"
     : "浏览器没有打开音频通道。请换 Safari 或 Chrome 再试一次。";
   speak("耳机测试。听到这句话，就说明实时教练语音已经打开。", true);
 });
