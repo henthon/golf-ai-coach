@@ -168,11 +168,24 @@ function playCueTone(force = false, pattern = "short") {
 
 function pickVoice() {
   refreshVoices();
-  return state.voices.find((voice) => /zh[-_](CN|HK|TW)/i.test(voice.lang))
-    || state.voices.find((voice) => /Chinese|Mandarin|Ting-Ting|Sin-ji|Mei-Jia/i.test(voice.name))
+  const naturalName = /(Premium|Enhanced|Natural|Siri|婷婷|Ting-Ting|美佳|Mei-Jia|Sin-ji|Yu-shu|Li-mu|Mandarin|普通话|Chinese)/i;
+  return state.voices.find((voice) => /^zh[-_](CN|HK|TW)/i.test(voice.lang) && naturalName.test(voice.name))
+    || state.voices.find((voice) => /^zh[-_](CN|HK|TW)/i.test(voice.lang) && voice.localService)
+    || state.voices.find((voice) => /^zh[-_](CN|HK|TW)/i.test(voice.lang))
+    || state.voices.find((voice) => naturalName.test(voice.name))
     || state.voices.find((voice) => /^zh/i.test(voice.lang))
     || state.voices[0]
     || null;
+}
+
+function coachSpeakText(text) {
+  return text
+    .replace(/。/g, "。 ")
+    .replace(/，/g, "， ")
+    .replace(/下一杆/g, "下一杆，")
+    .replace(/保持/g, "保持")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 async function speak(text, force = false) {
@@ -189,12 +202,12 @@ async function speak(text, force = false) {
   if (force) synth.cancel();
   synth.resume();
 
-  const utterance = new SpeechSynthesisUtterance(text);
+  const utterance = new SpeechSynthesisUtterance(coachSpeakText(text));
   utterance.lang = "zh-CN";
   const voice = pickVoice();
   if (voice) utterance.voice = voice;
-  utterance.rate = 1.04;
-  utterance.pitch = 0.95;
+  utterance.rate = 0.88;
+  utterance.pitch = 1.03;
   utterance.volume = 1;
   utterance.onstart = () => {
     state.lastSpeechError = "";
